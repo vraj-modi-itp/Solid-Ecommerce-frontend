@@ -122,7 +122,7 @@ export function Layout() {
       </main>
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
-      {/* <StateDebugger /> */}
+      <StateDebugger />
     </div>
   );
 }   

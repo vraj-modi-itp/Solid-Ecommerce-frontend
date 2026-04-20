@@ -13,8 +13,6 @@ export function CartDrawer({ isOpen, onClose }) {
   const { state, send } = useCheckoutMachine();
 
   const [countdown, setCountdown] = useState(10);
-  
-  // NEW: Detect if this is a fresh checkout or a refresh recovery
   const [isRecovering, setIsRecovering] = useState(false);
 
   const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -31,45 +29,47 @@ export function CartDrawer({ isOpen, onClose }) {
   
   const showItems = isCart || isFailed || isInconsistent || isFraud || state.matches('DELIVERY_FAILED');
 
-  // Detect Recovery on Mount
+  // Detect Recovery
   useEffect(() => {
-    if (state.matches('PAYMENT_PENDING')) {
-      setIsRecovering(true);
-    }
-  }, []);
-
-  // Clear Recovery flag when exiting pending state
-  useEffect(() => {
-    if (!state.matches('PAYMENT_PENDING')) {
-      setIsRecovering(false);
-    }
+    if (state.matches('PAYMENT_PENDING')) setIsRecovering(true);
+    else setIsRecovering(false);
   }, [state.value]);
 
+  // EFFECT 1: Handle Cart Clearing & Status Toasts
   useEffect(() => {
     if (state.matches('CONFIRMED')) clearCart();
     
     if (state.changed) {
       toast.info(`System Status: ${state.value.toString().toUpperCase()}`, { id: 'status-toast' });
     }
+  }, [state.value, state.changed, clearCart]);
 
+  // EFFECT 2: The Circuit Breaker Timer (Isolated!)
+  useEffect(() => {
     let recoveryTimer;
     if (isPending) {
       recoveryTimer = setTimeout(() => {
         send({ type: 'FORCE_RECOVERY' });
-        if (isRecovering) toast.error("Session stalled. Restored to Cart.");
-      }, 5000);
+        toast.error("Session stalled. Restored to Cart.", {
+          id: 'timeout-toast',
+          duration: 5000
+        });
+      }, 4900); // 4900ms to beat XState's internal 5000ms clock
     }
-    
+    return () => clearTimeout(recoveryTimer);
+  }, [isPending, send]); 
+  // Notice 'countdown' is NOT in this array anymore! It won't reset early.
+
+  // EFFECT 3: The Visual Countdown Clock
+  useEffect(() => {
     let pollTimer;
     if (isPending && countdown > 0) {
       pollTimer = setInterval(() => setCountdown(prev => prev - 1), 1000);
+    } else if (!isPending && countdown !== 10) {
+      setCountdown(10); // Reset clock for the next checkout attempt
     }
-
-    return () => {
-      clearTimeout(recoveryTimer);
-      clearInterval(pollTimer);
-    };
-  }, [state.value, clearCart, state.changed, isPending, countdown, send, isRecovering]);
+    return () => clearInterval(pollTimer);
+  }, [isPending, countdown]);
 
   if (!isOpen) return null;
 
@@ -100,7 +100,6 @@ export function CartDrawer({ isOpen, onClose }) {
 
         <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
           
-          {/* SEC-02: Integrity Violation */}
           {isInconsistent && (
             <div className="text-center py-10 space-y-4 bg-orange-50 rounded-2xl p-6 border border-orange-200 mb-6 animate-in zoom-in duration-300">
               <ShieldAlert className="mx-auto h-12 w-12 text-orange-600" />
@@ -115,7 +114,6 @@ export function CartDrawer({ isOpen, onClose }) {
             </div>
           )}
 
-          {/* DYNAMIC PROCESSING UI: Separates "Fresh Checkout" from "Refresh Recovery" */}
           {isPending && (
             <div className="text-center py-16 space-y-6">
               <div className="relative mx-auto w-20 h-20">

@@ -16,9 +16,3 @@ To maintain a strict 60fps rendering experience while handling high-volume DOM n
   * *Technique:* Memoized Derived State
   * *Implementation:* Sorting and filtering logic are encapsulated within React's `useMemo` hook.
   * *Impact:* Heavy arrays are only manipulated when dependencies explicitly change, rather than on every component re-render.
-
-## Profiling Evidence
-*(Note to Reviewer: Below are the profiling notes validating the above implementations).*
-
-* **[Insert Screenshot of Lighthouse Score here: Targeting 90+ Performance]**
-* **[Insert Screenshot of React Profiler here: Demonstrating skipped renders during search typing]**
